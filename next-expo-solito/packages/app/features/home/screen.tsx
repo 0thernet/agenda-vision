@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useStopwatch } from 'react-timer-hook'
 import { YStack, XStack, TextArea, Button, Text, Progress } from '@my/ui'
 
@@ -20,6 +20,14 @@ class Line {
   seconds: number
   filled: boolean
   text: string
+}
+
+function clamp(input: number, min: number, max: number) {
+  return Math.min(Math.max(input, min), max)
+}
+
+function active(input: number): boolean {
+  return input >= 0 && input <= 100
 }
 
 function parseLine(text: string): Line {
@@ -77,8 +85,6 @@ function parseAgenda(text: string): Agenda {
           line.filled = true
         }
       })
-      console.log('missing ' + missingSeconds)
-      console.log('filler ' + fillerSeconds)
     }
   }
   return agenda
@@ -88,10 +94,14 @@ export function HomeScreen() {
   const { seconds, minutes, hours, days, isRunning, start, pause, reset } = useStopwatch({
     autoStart: false,
   })
+  function timerSeconds(h: number, m: number, s: number): number {
+    return h * 60 * 60 + m * 60 + s
+  }
   const rowsInit: Line[] = [new Line(), new Line()]
   const agendaInit: Agenda = new Agenda()
   const [rows, setRows] = useState(rowsInit)
   const [agenda, setAgenda] = useState(agendaInit)
+
   return rows.map((line, index) => {
     if (index === 0) {
       return (
@@ -109,7 +119,13 @@ export function HomeScreen() {
             }}
           />
           <Text fontFamily="$body" fontSize={20}>
-            {`${hours}:${minutes}:${seconds}`}
+            {`${hours.toLocaleString('en-US', {
+              minimumIntegerDigits: 2,
+            })}:${minutes.toLocaleString('en-US', {
+              minimumIntegerDigits: 2,
+            })}:${seconds.toLocaleString('en-US', {
+              minimumIntegerDigits: 2,
+            })}`}{' '}
           </Text>
         </YStack>
       )
@@ -133,14 +149,47 @@ export function HomeScreen() {
       )
     } else if (line.text) {
       return (
-        <YStack borderWidth={2} padding={10} margin={3}>
+        <YStack
+          borderWidth={2}
+          padding={10}
+          margin={3}
+          backgroundColor={
+            active(
+              ((timerSeconds(hours, minutes, seconds) -
+                agenda
+                  .lines!.map((r) => r.seconds)
+                  .slice(0, index - 2)
+                  .reduce((a, b) => a + b, 0)) /
+                rows[index]!.seconds) *
+                100,
+              0,
+              100
+            )
+              ? 'yellow'
+              : 'transparent'
+          }
+        >
           {line.seconds > 0 && line.text && (
             <YStack>
               <Text fontFamily="$body" fontSize={20}>
                 {line.text}
               </Text>
               <XStack space>
-                <Progress flex={1} value={100}>
+                <Progress
+                  size="$4"
+                  flex={1}
+                  value={clamp(
+                    ((timerSeconds(hours, minutes, seconds) -
+                      agenda
+                        .lines!.map((r) => r.seconds)
+                        .slice(0, index - 2)
+                        .reduce((a, b) => a + b, 0)) /
+                      rows[index]!.seconds) *
+                      100,
+                    0,
+                    100
+                  )}
+                >
                   <Progress.Indicator animation="bouncy" />
                 </Progress>
                 <Text
